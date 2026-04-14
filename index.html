@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>夾娃機</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #0d0520; font-family: 'Arial Rounded MT Bold', Arial, sans-serif; touch-action: none; }
+#c { display: block; width: 100vw; height: 100vh; }
+
+/* HUD */
+#hud {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 18px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, transparent 100%);
+  color: #fff; z-index: 20; pointer-events: none;
+}
+#title { font-size: 1.35em; color: #ffd700; text-shadow: 0 0 12px #ff8c00, 0 0 4px #fff; }
+#cred  { font-size: 1em; }
+#cred span { color: #ffd700; font-size: 1.3em; font-weight: bold; }
+
+/* Collection shelf */
+#shelf {
+  position: fixed; bottom: 130px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+  max-width: 90vw; z-index: 20; pointer-events: none;
+}
+.c-item { font-size: 1.9em; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)); }
+
+/* Controls */
+#ctrl {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 22px; z-index: 20;
+}
+#dpad {
+  display: grid;
+  grid-template-columns: 48px 48px 48px;
+  grid-template-rows: 48px 48px 48px;
+  gap: 5px;
+}
+.db {
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,0.18); border: 2px solid rgba(255,255,255,0.35);
+  border-radius: 10px; color: #fff; font-size: 1.3em; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+  transition: background 0.1s;
+}
+.db:active, .db.active { background: rgba(255,255,255,0.45); }
+.de { visibility: hidden; }
+#grab-btn {
+  width: 88px; height: 88px;
+  background: radial-gradient(circle at 35% 35%, #ff7070, #cc0000);
+  border: 3px solid #ff9999; border-radius: 50%;
+  color: #fff; font-size: 1.05em; font-weight: bold; cursor: pointer;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+  box-shadow: 0 4px 18px rgba(255,60,60,0.6);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.1s;
+}
+#grab-btn:active { transform: scale(0.93); }
+
+/* Float message */
+#msg {
+  position: fixed; top: 45%; left: 50%; transform: translate(-50%,-50%);
+  background: rgba(0,0,0,0.82); color: #ff9999;
+  padding: 14px 28px; border-radius: 18px; font-size: 1.4em;
+  z-index: 80; display: none; pointer-events: none; text-align: center;
+}
+
+/* Overlay & Modal */
+#overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55); z-index: 90; display: none;
+}
+#modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0.8);
+  background: linear-gradient(135deg, #1a0a4e 0%, #3a1a7e 100%);
+  border: 3px solid #ffd700; border-radius: 22px;
+  padding: 28px 36px; color: #fff; text-align: center;
+  z-index: 100; min-width: 270px; display: none;
+  box-shadow: 0 0 50px rgba(255,215,0,0.5);
+  transition: transform 0.25s;
+}
+#modal.show { transform: translate(-50%,-50%) scale(1); }
+#modal h2 { font-size: 1.9em; color: #ffd700; margin-bottom: 6px; }
+#modal .doll-icon { font-size: 4.5em; margin: 12px 0; }
+#modal .doll-name { font-size: 1.25em; font-weight: bold; margin-bottom: 4px; }
+#modal .rarity { font-size: 0.95em; color: #ccc; margin-bottom: 20px; }
+#modal .rarity.sup { color: #ffd700; }
+#modal-btn {
+  padding: 11px 30px;
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #1a0a2e; border: none; border-radius: 25px;
+  font-size: 1.1em; font-weight: bold; cursor: pointer;
+  box-shadow: 0 3px 12px rgba(255,200,0,0.4);
+}
+
+/* Game over */
+#gameover {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0.8);
+  background: linear-gradient(135deg, #0d0520, #2a0a4e);
+  border: 3px solid #ffd700; border-radius: 22px;
+  padding: 30px 40px; color: #fff; text-align: center;
+  z-index: 110; display: none;
+  box-shadow: 0 0 50px rgba(255,215,0,0.4);
+  transition: transform 0.25s;
+}
+#gameover.show { transform: translate(-50%,-50%) scale(1); }
+#gameover h2 { font-size: 1.8em; color: #ffd700; margin-bottom: 12px; }
+#gameover .score { font-size: 1.1em; color: #ccc; margin-bottom: 20px; }
+#restart-btn {
+  padding: 11px 28px;
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #1a0a2e; border: none; border-radius: 25px;
+  font-size: 1.1em; font-weight: bold; cursor: pointer;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="title">🎮 夾娃機</div>
+  <div id="cred">剩餘次數：<span id="cred-n">10</span></div>
+</div>
+<div id="shelf"></div>
+
+<div id="ctrl">
+  <div id="dpad">
+    <div class="de"></div><div class="db" id="bu">▲</div><div class="de"></div>
+    <div class="db" id="bl">◄</div><div class="de"></div><div class="db" id="br">►</div>
+    <div class="de"></div><div class="db" id="bd">▼</div><div class="de"></div>
+  </div>
+  <button id="grab-btn">夾！<br>🎯</button>
+</div>
+
+<div id="msg"></div>
+<div id="overlay"></div>
+<div id="modal">
+  <h2>🎉 恭喜！</h2>
+  <div class="doll-icon" id="m-icon"></div>
+  <div class="doll-name" id="m-name"></div>
+  <div class="rarity" id="m-rarity"></div>
+  <button id="modal-btn" onclick="closeModal()">繼續玩！</button>
+</div>
+<div id="gameover">
+  <h2>遊戲結束</h2>
+  <div class="score" id="go-score"></div>
+  <button id="restart-btn" onclick="restartGame()">再玩一次！</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+const BOX_W = 8, BOX_H = 9, BOX_D = 8;
+const FLOOR_Y = -3.8;
+const CLAW_HOME_Y = 4.2;
+const GRAB_Y = FLOOR_Y + 4.43;  // 讓爪尖剛好貼到娃娃高度
+const XLIM = 2.8, ZLIM = 2.8;
+const CHUTE_X = -3.0, CHUTE_Z = 2.8;
+const CLAW_MOVE = 0.09;
+const V_SPEED = 4.5;
+const H_SPEED = 3.2;
+const FINGER_MAX = 0.48;
+
+// Grab probability per rarity
+const GRAB_PROB = { '普通': 0.50, '稀有': 0.28, '超稀有': 0.13 };
+
+// ─────────────────────────────────────────────
+// PET DEFINITIONS
+// ─────────────────────────────────────────────
+const DOLLS = [
+  { id: 'cat',    name: '橘貓',   rarity: '普通',   emoji: '🐱', weight: 32 },
+  { id: 'dog',    name: '柴犬',   rarity: '普通',   emoji: '🐶', weight: 28 },
+  { id: 'rabbit', name: '兔兔',   rarity: '普通',   emoji: '🐰', weight: 20 },
+  { id: 'lizard', name: '小蜥蜴', rarity: '稀有',   emoji: '🦎', weight: 13 },
+  { id: 'dragon', name: '神龍',   rarity: '超稀有', emoji: '🐲', weight:  7 },
+];
+
+// ─────────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────────
+let credits = 10;
+let collection = [];
+let dolls = [];          // {mesh, type, grabbed}
+let pendingGrab = null;  // {doll, success}
+let fallingDoll = null;  // {mesh, vy}
+let msgTimer = null;
+
+const ST = { IDLE:'idle', DESCEND:'descend', GRAB_ANIM:'grab_anim',
+             ASCEND:'ascend', DEPOSIT:'deposit', MODAL:'modal', RETURN:'return' };
+let state = ST.IDLE;
+let grabTimer = 0;
+
+// ─────────────────────────────────────────────
+// THREE.JS SCENE
+// ─────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x0d0520);
+
+const scene3 = new THREE.Scene();
+scene3.fog = new THREE.Fog(0x0d0520, 28, 55);
+
+const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 2.5, 12);
+camera.lookAt(0, 0, 0);
+
+// Lighting
+scene3.add(new THREE.AmbientLight(0xffffff, 0.45));
+const sun = new THREE.DirectionalLight(0xfffbe0, 0.9);
+sun.position.set(5, 12, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene3.add(sun);
+const fill = new THREE.PointLight(0x8080ff, 0.7, 25);
+fill.position.set(-6, 4, -6);
+scene3.add(fill);
+const topLight = new THREE.PointLight(0xffe8a0, 1.2, 20);
+topLight.position.set(0, 7, 0);
+topLight.castShadow = true;
+scene3.add(topLight);
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function mesh(geo, col, castShadow = true) {
+  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: col }));
+  if (castShadow) { m.castShadow = true; m.receiveShadow = true; }
+  return m;
+}
+function at(obj, x, y, z) { obj.position.set(x, y, z); return obj; }
+
+// ─────────────────────────────────────────────
+// BUILD MACHINE BOX
+// ─────────────────────────────────────────────
+const machine = new THREE.Group();
+scene3.add(machine);
+
+// ── 機柜本體 ──
+const CAB_H = 5.0, CAB_Y = FLOOR_Y - CAB_H / 2;
+// 主體
+const cabBody = mesh(new THREE.BoxGeometry(8.6, CAB_H, 8.6), 0xcc1188);
+at(cabBody, 0, CAB_Y, 0); machine.add(cabBody);
+// 正面面板（稍淺色）
+const cabFront = mesh(new THREE.BoxGeometry(8.6, CAB_H, 0.12), 0xee33aa);
+at(cabFront, 0, CAB_Y, 4.31); machine.add(cabFront);
+// 側邊裝飾條
+[-1, 1].forEach(s => {
+  const stripe = mesh(new THREE.BoxGeometry(0.35, CAB_H, 8.6), 0xffaa00);
+  at(stripe, s * 4.3, CAB_Y, 0); machine.add(stripe);
+});
+// 正面裝飾條
+[-1, 1].forEach(s => {
+  const stripe = mesh(new THREE.BoxGeometry(8.6, 0.3, 0.15), 0xffaa00);
+  at(stripe, 0, CAB_Y + s * (CAB_H / 2 - 0.15), 4.32); machine.add(stripe);
+});
+// 取物口外框
+const doorFrame = mesh(new THREE.BoxGeometry(3.4, 1.8, 0.18), 0xffcc00);
+at(doorFrame, 0, CAB_Y - 0.8, 4.33); machine.add(doorFrame);
+// 取物口暗槽
+const doorSlot = mesh(new THREE.BoxGeometry(2.8, 1.2, 0.35), 0x220033);
+at(doorSlot, 0, CAB_Y - 0.8, 4.28); machine.add(doorSlot);
+// 取物口擋板（半透明）
+const flapM = new THREE.MeshPhongMaterial({ color:0xffeecc, transparent:true, opacity:0.35 });
+const flap = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.2, 0.06), flapM);
+at(flap, 0, CAB_Y - 0.8, 4.38); machine.add(flap);
+// 機柜Logo面板
+const logoPan = mesh(new THREE.BoxGeometry(5.5, 1.0, 0.12), 0xffffff);
+at(logoPan, 0, CAB_Y + 1.5, 4.32); machine.add(logoPan);
+// 按鈕組
+[-0.9, 0, 0.9].forEach((x, i) => {
+  const btn = mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.12, 12), [0xff4444,0x44ff44,0x4444ff][i]);
+  btn.rotation.x = Math.PI/2;
+  at(btn, x, CAB_Y + 0.4, 4.38); machine.add(btn);
+});
+// 投幣口
+const coinSlot = mesh(new THREE.BoxGeometry(0.5, 0.12, 0.12), 0x333333);
+at(coinSlot, 1.8, CAB_Y + 0.4, 4.38); machine.add(coinSlot);
+// 底部踢腳
+const kickboard = mesh(new THREE.BoxGeometry(9.0, 0.28, 9.0), 0x333333);
+at(kickboard, 0, FLOOR_Y - CAB_H - 0.14, 0); machine.add(kickboard);
+// 腳輪
+[[-3.8,-3.8],[3.8,-3.8],[-3.8,3.8],[3.8,3.8]].forEach(([x,z]) => {
+  const wheel = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.22, 12), 0x222222);
+  at(wheel, x, FLOOR_Y - CAB_H - 0.35, z); machine.add(wheel);
+});
+
+// Floor
+const floor3 = mesh(new THREE.BoxGeometry(BOX_W, 0.25, BOX_D), 0x2255bb);
+at(floor3, 0, FLOOR_Y - 0.12, 0); machine.add(floor3);
+
+// Walls (glass)
+const glassM = new THREE.MeshPhongMaterial({
+  color: 0xaaddff, transparent: true, opacity: 0.13,
+  side: THREE.DoubleSide, depthWrite: false
+});
+const WALLS = [
+  [BOX_W, BOX_H, 0.08,  0, 0.5,  BOX_D/2],
+  [BOX_W, BOX_H, 0.08,  0, 0.5, -BOX_D/2],
+  [0.08,  BOX_H, BOX_D, BOX_W/2, 0.5, 0],
+  [0.08,  BOX_H, BOX_D,-BOX_W/2, 0.5, 0],
+];
+WALLS.forEach(([w,h,d,x,y,z]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), glassM);
+  m.position.set(x,y,z); machine.add(m);
+});
+
+// Glass edges
+const edgeM = new THREE.MeshLambertMaterial({ color: 0xff66bb });
+[[9,0.3,0.3, 0,5,  BOX_D/2],[9,0.3,0.3, 0,5, -BOX_D/2],
+ [0.3,0.3,9, BOX_W/2,5,0],  [0.3,0.3,9,-BOX_W/2,5,0],
+ [9,0.3,9,   0,5,0]].forEach(([w,h,d,x,y,z]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), edgeM);
+  m.position.set(x,y,z); machine.add(m);
+});
+
+// Rails
+const railM = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+const xRail = new THREE.Mesh(new THREE.BoxGeometry(7.5,0.14,0.14), railM);
+at(xRail, 0, 4.75, 0); machine.add(xRail);
+const zRail = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.14,7.5), railM);
+at(zRail, 0, 4.6, 0); machine.add(zRail);
+
+// ── 左前角方形洞口 ──
+const GX = CHUTE_X, GZ = CHUTE_Z;
+const GS = 1.1;   // 洞口半邊長（全尺寸 2.2 × 2.2）
+const FY = FLOOR_Y;
+
+// 洞口深色底（製造深度感）
+const holeBase = new THREE.Mesh(
+  new THREE.PlaneGeometry(GS * 2, GS * 2),
+  new THREE.MeshBasicMaterial({ color: 0x080808 })
+);
+holeBase.rotation.x = -Math.PI / 2;
+at(holeBase, GX, FY + 0.01, GZ); machine.add(holeBase);
+
+// 四邊斜面內壁（漏斗感）
+const wallM = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
+[
+  // 前壁  [0, -FY - GS*0.3 - 0.15, GZ + GS, 0, 0, 0],
+  [  0,  0,  1,  GS*2 + 0.1],
+  [  0,  0, -1,  GS*2 + 0.1],
+  [  1,  0,  0,  GS*2 + 0.1],
+  [ -1,  0,  0,  GS*2 + 0.1],
+].forEach(([nx, ny, nz, size]) => {
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(size, 0.55), wallM);
+  w.position.set(GX + nx * GS, FY - 0.27, GZ + nz * GS);
+  w.rotation.set(nx !== 0 ? -Math.PI/2 + 0.35 * nx : 0,
+                 nx !== 0 ? Math.PI/2 : (nz > 0 ? 0 : Math.PI),
+                 0);
+  machine.add(w);
+});
+
+// 四邊金屬邊框
+const FT = 0.15;
+[
+  [GX,             FY+0.06, GZ - GS - FT/2, GS*2 + FT*2, 0.12, FT],
+  [GX,             FY+0.06, GZ + GS + FT/2, GS*2 + FT*2, 0.12, FT],
+  [GX - GS - FT/2, FY+0.06, GZ,             FT, 0.12, GS*2],
+  [GX + GS + FT/2, FY+0.06, GZ,             FT, 0.12, GS*2],
+].forEach(([x,y,z,w,h,d]) => {
+  const m = mesh(new THREE.BoxGeometry(w,h,d), 0x888888);
+  at(m,x,y,z); machine.add(m);
+});
+
+// 洞口下方暗管（延伸進機柜）
+const shaft = new THREE.Mesh(
+  new THREE.BoxGeometry(GS*2, 5.2, GS*2),
+  new THREE.MeshLambertMaterial({ color: 0x0a0a0a, side: THREE.BackSide })
+);
+at(shaft, GX, FY - 2.6, GZ); machine.add(shaft);
+
+// Stars backdrop
+for (let i = 0; i < 120; i++) {
+  const s = new THREE.Mesh(new THREE.SphereGeometry(0.04,4,4), new THREE.MeshBasicMaterial({color:0xffffff}));
+  s.position.set((Math.random()-0.5)*70,(Math.random()-0.5)*50,(Math.random()-0.5)*70 - 15);
+  scene3.add(s);
+}
+
+// ─────────────────────────────────────────────
+// CLAW
+// ─────────────────────────────────────────────
+const clawG = new THREE.Group();
+clawG.position.set(0, CLAW_HOME_Y, 0);
+scene3.add(clawG);
+
+// 滑車頂塊
+const trolley = mesh(new THREE.BoxGeometry(0.85, 0.28, 0.85), 0x999999);
+clawG.add(trolley);
+
+// 鋼絲
+const cable = mesh(new THREE.CylinderGeometry(0.026, 0.026, 2.0, 8), 0x555555);
+at(cable, 0, -1.0, 0); clawG.add(cable);
+
+// 馬達外殼（圓柱）
+const motorBody = mesh(new THREE.CylinderGeometry(0.30, 0.26, 0.52, 16), 0x888888);
+at(motorBody, 0, -2.06, 0); clawG.add(motorBody);
+// 底環
+const baseRing = new THREE.Mesh(
+  new THREE.TorusGeometry(0.22, 0.048, 8, 20),
+  new THREE.MeshLambertMaterial({ color: 0x666666 })
+);
+baseRing.rotation.x = Math.PI / 2;
+at(baseRing, 0, -2.33, 0); clawG.add(baseRing);
+
+// 三爪（TubeGeometry 弧形）
+const fingers = [];
+const FANGLES = [0, 2 * Math.PI / 3, 4 * Math.PI / 3];
+
+FANGLES.forEach(ang => {
+  // pivot：繞 Y 軸指向正確方位
+  const pivot = new THREE.Group();
+  pivot.position.set(0, -2.33, 0);
+  pivot.rotation.y = ang;
+
+  // armGroup：繞 Z 軸開合
+  const armGroup = new THREE.Group();
+
+  // 弧形爪臂
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.00,  0.00, 0),
+    new THREE.Vector3(0.10, -0.22, 0),
+    new THREE.Vector3(0.22, -0.52, 0),
+    new THREE.Vector3(0.32, -0.90, 0),
+    new THREE.Vector3(0.34, -1.22, 0),
+    new THREE.Vector3(0.26, -1.50, 0),
+    new THREE.Vector3(0.10, -1.68, 0),
+    new THREE.Vector3(0.00, -1.75, 0),  // 尖端內勾
+  ]);
+  const armTube = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 20, 0.046, 8, false),
+    new THREE.MeshLambertMaterial({ color: 0xcccccc })
+  );
+  armTube.castShadow = true;
+  armGroup.add(armTube);
+
+  // 尖端球
+  const tip = mesh(new THREE.SphereGeometry(0.068, 8, 8), 0x777777);
+  at(tip, 0.0, -1.75, 0); armGroup.add(tip);
+
+  // 根部鉸鏈
+  const hinge = mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.14, 10), 0x777777);
+  hinge.rotation.z = Math.PI / 2;
+  at(hinge, 0.06, 0.0, 0); armGroup.add(hinge);
+
+  pivot.add(armGroup);
+  clawG.add(pivot);
+  fingers.push({ group: armGroup, angle: ang });
+});
+
+let fingerOpen = FINGER_MAX;
+function updateFingers() {
+  // fingerOpen: 0.05(夾緊) ~ FINGER_MAX 0.48(張開)
+  // rotation.z: -0.28(夾緊) ~ 0.55(張開)
+  const rot = THREE.MathUtils.mapLinear(fingerOpen, 0.02, FINGER_MAX, -0.45, 0.55);
+  fingers.forEach(f => { f.group.rotation.z = rot; });
+}
+updateFingers();
+
+// Claw indicator light
+const clawLight = new THREE.PointLight(0x00ffaa, 0.6, 4);
+clawLight.position.set(0, -2.4, 0);
+clawG.add(clawLight);
+
+// Shadow plane under claw (projected circle)
+const shadowPlane = new THREE.Mesh(
+  new THREE.CircleGeometry(0.5,20),
+  new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.25, depthWrite:false })
+);
+shadowPlane.rotation.x = -Math.PI/2;
+scene3.add(shadowPlane);
+
+// ── 夾住括號指示器 ──
+// 用四個 L 形角框組成「[ 娃娃 ]」效果
+const grabIndicator = new THREE.Group();
+scene3.add(grabIndicator);
+grabIndicator.visible = false;
+
+const BMAT = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+const T = 0.045, ARM = 0.32, BH = 0.75; // 線粗、橫臂長、總高
+
+[[-1, 1], [1, -1]].forEach(([sideX]) => {
+  // 垂直主桿
+  const vbar = new THREE.Mesh(new THREE.BoxGeometry(T, BH, T), BMAT);
+  vbar.position.set(sideX * 0.72, 0, 0);
+  grabIndicator.add(vbar);
+  // 上橫臂
+  const topArm = new THREE.Mesh(new THREE.BoxGeometry(ARM, T, T), BMAT);
+  topArm.position.set(sideX * (0.72 - ARM/2 * Math.sign(sideX) * -1), BH/2, 0);
+  // 橫臂朝內：sideX=-1（左括）朝右，sideX=1（右括）朝左
+  topArm.position.x = sideX * 0.72 + (sideX > 0 ? -ARM/2 : ARM/2);
+  grabIndicator.add(topArm);
+  // 下橫臂
+  const botArm = topArm.clone();
+  botArm.position.y = -BH/2;
+  grabIndicator.add(botArm);
+});
+
+// ─────────────────────────────────────────────
+// PET BUILDERS
+// ─────────────────────────────────────────────
+function mat(c) { return new THREE.MeshLambertMaterial({ color: c }); }
+function pm(g, geo, col, px,py,pz, rx=0,ry=0,rz=0) {
+  const m = new THREE.Mesh(geo, mat(col));
+  m.position.set(px,py,pz); m.rotation.set(rx,ry,rz); m.castShadow = true;
+  g.add(m); return m;
+}
+function eyes(g, y, z, sep, c=0x111111) {
+  [-sep,sep].forEach(x => {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.055,8,8), mat(c));
+    e.position.set(x,y,z); g.add(e);
+  });
+}
+function makeTailSegments(color, segs, len) {
+  // 返回可動尾巴 group（沿 +X 延伸）
+  const tg = new THREE.Group();
+  for (let i = 0; i < segs; i++) {
+    const r = 0.07 * (1 - i / segs * 0.6);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 8), mat(color));
+    s.position.x = len * (i + 0.5) / segs;
+    tg.add(s);
+  }
+  return tg;
+}
+
+// ── 橘貓 ──
+function buildCat() {
+  const g = new THREE.Group();
+  const C = 0xFF8C42, DARK = 0xCC5500, PINK = 0xFFAABB;
+  // 身體
+  pm(g, new THREE.SphereGeometry(0.38,16,16), C, 0,0,0);
+  // 頭
+  pm(g, new THREE.SphereGeometry(0.30,16,16), C, 0,0.60,0);
+  // 耳朵（三角）
+  pm(g, new THREE.ConeGeometry(0.10,0.22,4), C,   -0.20,0.94,0, 0,0, 0.30);
+  pm(g, new THREE.ConeGeometry(0.10,0.22,4), C,    0.20,0.94,0, 0,0,-0.30);
+  pm(g, new THREE.ConeGeometry(0.055,0.14,4), PINK,-0.20,0.94,0, 0,0, 0.30);
+  pm(g, new THREE.ConeGeometry(0.055,0.14,4), PINK, 0.20,0.94,0, 0,0,-0.30);
+  // 鼻嘴
+  pm(g, new THREE.SphereGeometry(0.038,8,8), 0xFF6688, 0,0.55,0.28);
+  // 眼睛（黃綠色）
+  eyes(g, 0.63, 0.27, 0.11, 0x88CC44);
+  eyes(g, 0.63, 0.275, 0.09, 0x111111);
+  // 鬍鬚
+  [[-0.30,0.53,0.24],[-0.30,0.51,0.24],[0.30,0.53,0.24],[0.30,0.51,0.24]].forEach(([x,y,z])=>{
+    const w = new THREE.Mesh(new THREE.BoxGeometry(0.28,0.01,0.01), mat(0xdddddd));
+    w.position.set(x,y,z); g.add(w);
+  });
+  // 尾巴（可搖）
+  const tail = makeTailSegments(DARK, 7, 0.7);
+  tail.position.set(-0.35, 0.05, -0.1);
+  tail.rotation.z = 1.2;
+  g.add(tail);
+  // 虎斑條紋
+  [0.10,-0.10].forEach(z => pm(g, new THREE.BoxGeometry(0.55,0.06,0.04), DARK, 0,0.05,z, 0.2,0,0));
+
+  g.userData.update = (t, idx) => {
+    tail.rotation.z = 1.2 + Math.sin(t*0.0025 + idx) * 0.55;
+    tail.rotation.y = Math.sin(t*0.0018 + idx*0.7) * 0.3;
+  };
+  return g;
+}
+
+// ── 柴犬 ──
+function buildDog() {
+  const g = new THREE.Group();
+  const C = 0xE8A020, CREAM = 0xFFF0CC, DARK = 0x8B4500;
+  pm(g, new THREE.SphereGeometry(0.40,16,16), C, 0,0,0);
+  pm(g, new THREE.SphereGeometry(0.31,16,16), C, 0,0.62,0);
+  // 口鼻部
+  pm(g, new THREE.SphereGeometry(0.17,12,12), CREAM, 0,0.56,0.24);
+  pm(g, new THREE.SphereGeometry(0.042,8,8), 0x331100, 0,0.60,0.39);
+  // 耳朵（三角立耳）
+  pm(g, new THREE.ConeGeometry(0.11,0.24,4), C,  -0.22,0.93,0, 0,0, 0.15);
+  pm(g, new THREE.ConeGeometry(0.11,0.24,4), C,   0.22,0.93,0, 0,0,-0.15);
+  // 眼睛
+  eyes(g, 0.65, 0.25, 0.12, 0x331100);
+  // 尾巴（捲起向上）
+  const tail = new THREE.Group();
+  const tailCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0,0,0), new THREE.Vector3(0.1,0.2,0),
+    new THREE.Vector3(0.25,0.35,0), new THREE.Vector3(0.28,0.5,0),
+    new THREE.Vector3(0.18,0.6,0),
+  ]);
+  const tailMesh = new THREE.Mesh(
+    new THREE.TubeGeometry(tailCurve, 10, 0.055, 8, false),
+    mat(DARK)
+  );
+  tail.add(tailMesh);
+  tail.position.set(-0.32, 0.0, -0.3);
+  g.add(tail);
+  // 腹部白色
+  pm(g, new THREE.SphereGeometry(0.22,12,12), CREAM, 0,-0.1,0.25);
+
+  g.userData.update = (t, idx) => {
+    tail.rotation.z = Math.sin(t * 0.006 + idx) * 0.55;
+  };
+  return g;
+}
+
+// ── 兔兔 ──
+function buildRabbit() {
+  const g = new THREE.Group();
+  const C = 0xFFCCDD, PINK = 0xFF99BB;
+  pm(g, new THREE.SphereGeometry(0.40,16,16), C, 0,0,0);
+  pm(g, new THREE.SphereGeometry(0.32,16,16), C, 0,0.64,0);
+  // 長耳
+  const earL = new THREE.Group(); earL.position.set(-0.17,0.90,0); earL.rotation.z= 0.18;
+  pm(earL, new THREE.CylinderGeometry(0.075,0.065,0.60,10), C, 0,0.30,0);
+  pm(earL, new THREE.CylinderGeometry(0.042,0.038,0.50,8), PINK, 0,0.30,0);
+  g.add(earL);
+  const earR = earL.clone(); earR.position.set(0.17,0.90,0); earR.rotation.z=-0.18;
+  g.add(earR);
+  // 鼻、眼
+  pm(g, new THREE.SphereGeometry(0.038,8,8), 0xFF6699, 0,0.60,0.30);
+  eyes(g, 0.66, 0.28, 0.11, 0xFF3377);
+  // 尾巴（小圓球）
+  const tail = pm(g, new THREE.SphereGeometry(0.10,8,8), 0xffffff, -0.10,0.05,-0.36);
+
+  g.userData.update = (t, idx) => {
+    earL.rotation.z = 0.18 + Math.sin(t*0.0015 + idx*1.3) * 0.18;
+    earR.rotation.z = -0.18 - Math.sin(t*0.0015 + idx*1.3) * 0.18;
+    tail.position.y = 0.05 + Math.sin(t*0.004 + idx) * 0.03;
+  };
+  return g;
+}
+
+// ── 小蜥蜴 ──
+function buildLizard() {
+  const g = new THREE.Group();
+  const C = 0x44AA44, BELLY = 0x99DD77, DARK = 0x227722;
+  // 身體（橫向橢圓柱）
+  const body = new THREE.Group();
+  pm(body, new THREE.CylinderGeometry(0.20,0.18,0.80,12), C, 0,0,0, 0,0,Math.PI/2);
+  pm(body, new THREE.SphereGeometry(0.20,12,12), BELLY, 0,-0.02,0); // 肚子
+  g.add(body);
+  // 頭
+  const head = new THREE.Group();
+  head.position.set(0.52, 0.04, 0);
+  pm(head, new THREE.BoxGeometry(0.30,0.18,0.22), C, 0,0,0);
+  pm(head, new THREE.BoxGeometry(0.22,0.12,0.18), BELLY, 0,-0.04,0); // 下顎
+  eyes(head, 0.08, 0.10, 0.07, 0xFFCC00);
+  eyes(head, 0.08, 0.105, 0.055, 0x111111);
+  g.add(head);
+  // 四條腿
+  [[-0.25,0.20],[-0.25,-0.20],[0.22,0.20],[0.22,-0.20]].forEach(([bx,bz],i) => {
+    const leg = new THREE.Group();
+    pm(leg, new THREE.CylinderGeometry(0.04,0.035,0.28,8), C, 0,-0.14,0);
+    pm(leg, new THREE.CylinderGeometry(0.035,0.03,0.20,8), C, 0,-0.34,0, 0,0,0.5);
+    leg.position.set(bx,-0.15,bz);
+    leg.rotation.z = i<2 ? -0.4 : 0.4;
+    g.add(leg);
+  });
+  // 長尾巴
+  const tail = makeTailSegments(DARK, 10, 0.90);
+  tail.position.set(-0.52, 0.02, 0);
+  tail.rotation.y = 0.4;
+  g.add(tail);
+
+  g.userData.update = (t, idx) => {
+    const sw = Math.sin(t*0.002 + idx * 1.1);
+    body.rotation.y = sw * 0.14;
+    head.rotation.y = sw * 0.22;
+    tail.rotation.y = 0.4 - sw * 0.5;
+    tail.rotation.z = Math.sin(t*0.0015 + idx) * 0.2;
+  };
+  return g;
+}
+
+// ── 神龍（超稀有）──
+function buildDragon() {
+  const g = new THREE.Group();
+  const C = 0x9933CC, GOLD = 0xFFCC00, SCALE = 0x6600AA;
+  // 身體
+  const body = new THREE.Group();
+  pm(body, new THREE.CylinderGeometry(0.22,0.18,0.85,14), C, 0,0,0, 0,0,Math.PI/2);
+  // 鱗片
+  for (let i=0; i<5; i++) pm(body, new THREE.SphereGeometry(0.08,6,6), SCALE, -0.28+i*0.14, 0.18, 0);
+  g.add(body);
+  // 頭
+  const head = new THREE.Group();
+  head.position.set(0.55, 0.06, 0);
+  pm(head, new THREE.BoxGeometry(0.32,0.20,0.24), C, 0,0,0);
+  // 龍角
+  pm(head, new THREE.ConeGeometry(0.04,0.22,6), GOLD, -0.06,0.18,0, 0,0,-0.25);
+  pm(head, new THREE.ConeGeometry(0.04,0.22,6), GOLD,  0.06,0.18,0, 0,0, 0.25);
+  eyes(head, 0.08, 0.11, 0.08, 0xFF4400);
+  eyes(head, 0.08, 0.115, 0.06, 0x111111);
+  g.add(head);
+  // 翅膀（左右各一）
+  const makeWing = (side) => {
+    const wg = new THREE.Group();
+    const wingCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0,0,0), new THREE.Vector3(0,0.28,side*0.15),
+      new THREE.Vector3(0,0.45,side*0.40), new THREE.Vector3(0,0.32,side*0.65),
+    ]);
+    wg.add(new THREE.Mesh(
+      new THREE.TubeGeometry(wingCurve,8,0.025,6,false),
+      mat(GOLD)
+    ));
+    // 翅膜
+    const shape = new THREE.Shape();
+    shape.moveTo(0,0); shape.lineTo(0,0.45); shape.lineTo(0,0.65); shape.lineTo(0,0);
+    const membrane = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.55, 0.40),
+      new THREE.MeshLambertMaterial({color:0xBB55FF,transparent:true,opacity:0.65,side:THREE.DoubleSide})
+    );
+    membrane.rotation.z = side > 0 ? -0.5 : 0.5;
+    membrane.position.set(0, 0.25, side*0.28);
+    wg.add(membrane);
+    wg.position.set(0.0, 0.18, 0);
+    return wg;
+  };
+  const wingL = makeWing(-1); const wingR = makeWing(1);
+  g.add(wingL); g.add(wingR);
+  // 四腿
+  [[-0.25,0.20],[-0.25,-0.20],[0.20,0.20],[0.20,-0.20]].forEach(([bx,bz],i) => {
+    const leg = new THREE.Group();
+    pm(leg, new THREE.CylinderGeometry(0.045,0.038,0.28,8), C, 0,-0.14,0);
+    leg.position.set(bx,-0.16,bz);
+    g.add(leg);
+  });
+  // 尾巴
+  const tail = makeTailSegments(SCALE, 12, 1.0);
+  tail.position.set(-0.55, 0.02, 0);
+  g.add(tail);
+
+  g.userData.update = (t, idx) => {
+    const flap = Math.sin(t*0.004 + idx*0.8);
+    wingL.rotation.z =  flap * 0.45;
+    wingR.rotation.z = -flap * 0.45;
+    tail.rotation.y = Math.sin(t*0.0022 + idx) * 0.55;
+    head.rotation.y = Math.sin(t*0.0018 + idx*0.5) * 0.18;
+  };
+  return g;
+}
+
+// 每種動物的色相偏移調色盤（讓同種動物出現多種顏色）
+const HUE_PALETTES = {
+  cat:    [0, 0.05, 0.55, 0.62, 0.08],   // 橘/米/藍灰/灰/黃
+  dog:    [0.07, 0.0, 0.62, 0.08, 0.14], // 柴/白/灰/金/棕
+  rabbit: [0.85, 0.32, 0.62, 0.0, 0.55], // 粉/綠/藍/橘/紫
+  lizard: [0.32, 0.48, 0.55, 0.08, 0.16],// 綠/青/藍/橙/棕
+  dragon: [0.75, 0.62, 0.04, 0.0, 0.48], // 紫/藍/金/紅/青
+};
+
+function applyHueShift(group, shift) {
+  group.traverse(child => {
+    if (!child.isMesh || !child.material || child.material.transparent) return;
+    const c = child.material.color;
+    const hsl = {};  c.getHSL(hsl);
+    child.material = child.material.clone();
+    child.material.color.setHSL((hsl.h + shift + 1) % 1, Math.min(1, hsl.s * 1.1), hsl.l);
+  });
+}
+
+function buildDoll(t) {
+  let g;
+  switch(t.id) {
+    case 'cat':    g = buildCat();    break;
+    case 'dog':    g = buildDog();    break;
+    case 'rabbit': g = buildRabbit(); break;
+    case 'lizard': g = buildLizard(); break;
+    case 'dragon': g = buildDragon(); break;
+    default:       g = buildCat();
+  }
+  const palette = HUE_PALETTES[t.id] || [0];
+  const shift = palette[Math.floor(Math.random() * palette.length)];
+  applyHueShift(g, shift);
+  return g;
+}
+
+// ─────────────────────────────────────────────
+// SPAWN DOLLS
+// ─────────────────────────────────────────────
+function pickType() {
+  const total = DOLLS.reduce((s,d) => s+d.weight, 0);
+  let r = Math.random() * total;
+  for (const d of DOLLS) { r -= d.weight; if (r <= 0) return d; }
+  return DOLLS[0];
+}
+
+function spawnDolls() {
+  dolls.forEach(d => scene3.remove(d.mesh));
+  dolls = [];
+  // 全部貼地，用 7x7 網格分散初始位置
+  const GROUND_Y = FLOOR_Y + 0.42;
+  const COLS = 7, ROWS = 7, SPREAD = 6.2;
+  const nearHole = (x, z) =>
+    Math.abs(x - CHUTE_X) < GS + 0.5 && Math.abs(z - CHUTE_Z) < GS + 0.5;
+
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      let x = -SPREAD/2 + col * (SPREAD/(COLS-1)) + (Math.random()-0.5)*0.5;
+      let z = -SPREAD/2 + row * (SPREAD/(ROWS-1)) + (Math.random()-0.5)*0.5;
+      // 洞口附近不放娃娃，重新取一個遠離洞口的位置
+      let tries = 0;
+      while (nearHole(x, z) && tries++ < 20) {
+        x = (Math.random() - 0.5) * SPREAD;
+        z = (Math.random() - 0.5) * SPREAD;
+      }
+      if (nearHole(x, z)) continue; // 實在找不到就跳過
+      const type = pickType();
+      const m = buildDoll(type);
+      m.position.set(x, GROUND_Y, z);
+      m.rotation.y = Math.random() * Math.PI * 2;
+      const sc = 0.72 + Math.random() * 0.20;
+      m.scale.setScalar(sc);
+      m.userData.origScale = sc;
+      scene3.add(m);
+      dolls.push({
+        mesh: m, type, grabbed: false,
+        baseY: GROUND_Y,
+        wtx: (Math.random()-0.5)*5.2,
+        wtz: (Math.random()-0.5)*5.2,
+        wspd: 0.20 + Math.random() * 0.30,
+        wphase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// GRAB LOGIC
+// ─────────────────────────────────────────────
+function nearestDoll() {
+  let best = null, bestD = 1.4;
+  const cx = clawG.position.x, cz = clawG.position.z;
+  for (const d of dolls) {
+    if (d.grabbed) continue;
+    const dx = d.mesh.position.x - cx, dz = d.mesh.position.z - cz;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist < bestD) { bestD = dist; best = d; }
+  }
+  return best;
+}
+
+function startGrab() {
+  if (state !== ST.IDLE) return;
+  if (credits <= 0) return;
+  credits--;
+  document.getElementById('cred-n').textContent = credits;
+  playClick();
+  state = ST.DESCEND;
+}
+
+// ─────────────────────────────────────────────
+// AUDIO (Web Audio API)
+// ─────────────────────────────────────────────
+let actx = null;
+function getACtx() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type='sine', vol=0.25, delay=0) {
+  try {
+    const ctx = getACtx();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = type; o.frequency.value = freq;
+    const t = ctx.currentTime + delay;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.start(t); o.stop(t + dur);
+  } catch(e) {}
+}
+function playClick()   { tone(900, 0.06, 'square', 0.12); }
+function playMove()    { tone(600, 0.04, 'square', 0.06); }
+function playDescend() { tone(440, 0.1, 'triangle', 0.1); }
+function playFail()    { tone(280,0.12,'sawtooth',0.18); tone(200,0.2,'sawtooth',0.14,0.1); }
+function playSuccess() {
+  [523,659,784,1047].forEach((f,i) => tone(f, 0.25, 'sine', 0.2, i*0.1));
+}
+
+// Background music
+const NOTES = [523,587,659,698,784,880,988,1047];
+let noteIdx = 0;
+let bgInterval = null;
+function startBGMusic() {
+  if (bgInterval) return;
+  bgInterval = setInterval(() => {
+    tone(NOTES[noteIdx % NOTES.length] * (Math.random()>0.85 ? 0.5 : 1), 0.35, 'sine', 0.07);
+    if (Math.random() > 0.7) {
+      const bass = [130,146,164,174,196];
+      tone(bass[Math.floor(Math.random()*bass.length)], 0.6, 'triangle', 0.05);
+    }
+    noteIdx++;
+  }, 480);
+}
+
+// ─────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────
+function showMsg(txt, dur = 1800) {
+  const el = document.getElementById('msg');
+  el.textContent = txt; el.style.display = 'block';
+  if (msgTimer) clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { el.style.display = 'none'; }, dur);
+}
+
+function updateShelf() {
+  document.getElementById('shelf').innerHTML =
+    collection.map(t => `<span class="c-item" title="${t.name}">${t.emoji}</span>`).join('');
+}
+
+function showModal(type) {
+  document.getElementById('m-icon').textContent = type.emoji;
+  document.getElementById('m-name').textContent = type.name;
+  const rEl = document.getElementById('m-rarity');
+  rEl.textContent = `✨ 稀有度：${type.rarity}`;
+  rEl.className = 'rarity' + (type.rarity === '超稀有' ? ' sup' : '');
+  document.getElementById('overlay').style.display = 'block';
+  const modal = document.getElementById('modal');
+  modal.style.display = 'block';
+  requestAnimationFrame(() => modal.classList.add('show'));
+}
+
+function closeModal() {
+  const modal = document.getElementById('modal');
+  modal.classList.remove('show');
+  setTimeout(() => { modal.style.display = 'none'; }, 250);
+  document.getElementById('overlay').style.display = 'none';
+  state = ST.RETURN;
+
+  if (dolls.every(d => d.grabbed)) {
+    setTimeout(() => { showMsg('所有娃娃都抓完了！補貨中…', 1500); spawnDolls(); }, 400);
+  }
+  if (credits <= 0) {
+    setTimeout(showGameOver, 300);
+  }
+}
+
+function showGameOver() {
+  document.getElementById('go-score').textContent =
+    `共抓到 ${collection.length} 隻娃娃：${collection.map(t=>t.emoji).join(' ')||'一隻也沒有 😢'}`;
+  const el = document.getElementById('gameover');
+  el.style.display = 'block';
+  requestAnimationFrame(() => el.classList.add('show'));
+}
+
+function restartGame() {
+  credits = 10;
+  collection = [];
+  document.getElementById('cred-n').textContent = credits;
+  updateShelf();
+  const el = document.getElementById('gameover');
+  el.classList.remove('show');
+  setTimeout(() => { el.style.display = 'none'; }, 250);
+  spawnDolls();
+  clawG.position.set(0, CLAW_HOME_Y, 0);
+  fingerOpen = FINGER_MAX; updateFingers();
+  state = ST.IDLE;
+}
+
+// ─────────────────────────────────────────────
+// CONTROLS
+// ─────────────────────────────────────────────
+const keys = { up:false, dn:false, lt:false, rt:false };
+
+function setupBtn(id, key) {
+  const el = document.getElementById(id);
+  const on  = e => { e.preventDefault(); keys[key] = true; ensureMusic(); };
+  const off = e => { e.preventDefault(); keys[key] = false; };
+  el.addEventListener('touchstart', on, { passive:false });
+  el.addEventListener('touchend',   off,{ passive:false });
+  el.addEventListener('mousedown',  on);
+  el.addEventListener('mouseup',    off);
+  el.addEventListener('mouseleave', off);
+}
+setupBtn('bu','up'); setupBtn('bd','dn');
+setupBtn('bl','lt'); setupBtn('br','rt');
+
+document.getElementById('grab-btn').addEventListener('click', () => { ensureMusic(); startGrab(); });
+document.getElementById('grab-btn').addEventListener('touchstart', e => {
+  e.preventDefault(); ensureMusic(); startGrab();
+}, { passive:false });
+
+document.addEventListener('keydown', e => {
+  ensureMusic();
+  if (e.key==='ArrowUp')    keys.up = true;
+  if (e.key==='ArrowDown')  keys.dn = true;
+  if (e.key==='ArrowLeft')  keys.lt = true;
+  if (e.key==='ArrowRight') keys.rt = true;
+  if (e.key===' ' || e.key==='Enter') { e.preventDefault(); startGrab(); }
+});
+document.addEventListener('keyup', e => {
+  if (e.key==='ArrowUp')    keys.up = false;
+  if (e.key==='ArrowDown')  keys.dn = false;
+  if (e.key==='ArrowLeft')  keys.lt = false;
+  if (e.key==='ArrowRight') keys.rt = false;
+});
+
+let musicOn = false;
+function ensureMusic() {
+  if (!musicOn) { musicOn = true; getACtx(); startBGMusic(); }
+}
+
+// ─────────────────────────────────────────────
+// UPDATE STATE MACHINE
+// ─────────────────────────────────────────────
+function updateState(dt) {
+  const cp = clawG.position;
+
+  if (state === ST.DESCEND) {
+    fingerOpen = Math.min(FINGER_MAX, fingerOpen + dt * 1.8);
+    updateFingers();
+    cp.y -= V_SPEED * dt;
+    if (cp.y <= GRAB_Y) {
+      cp.y = GRAB_Y;
+      playDescend();
+      // Determine grab
+      const nearest = nearestDoll();
+      if (nearest) {
+        const ok = Math.random() < (GRAB_PROB[nearest.type.rarity] ?? 0.4);
+        pendingGrab = { doll: nearest, success: ok };
+      } else {
+        pendingGrab = { doll: null, success: false };
+      }
+      tone(pendingGrab.success ? 520 : 280, 0.12, 'square', 0.15);
+      if (pendingGrab.success && pendingGrab.doll) {
+        // 把娃娃拉到爪子正下方
+        const dp = pendingGrab.doll.mesh.position;
+        dp.set(cp.x, cp.y - 4.0, cp.z);
+        pendingGrab.doll.mesh.rotation.set(0, pendingGrab.doll.mesh.rotation.y, 0);
+        // 顯示括號，位置對齊娃娃
+        grabIndicator.visible = true;
+        grabIndicator.position.copy(dp);
+        grabIndicator.scale.setScalar(pendingGrab.doll.mesh.userData.origScale ?? 0.85);
+      }
+      state = ST.GRAB_ANIM;
+      grabTimer = 0.55;
+    }
+
+  } else if (state === ST.GRAB_ANIM) {
+    fingerOpen = Math.max(0.02, fingerOpen - dt * 1.6);
+    updateFingers();
+    if (pendingGrab && pendingGrab.success && pendingGrab.doll) {
+      const progress = 1 - (grabTimer / 0.55);
+      const jitter  = Math.sin(grabTimer * 90) * 0.025 * (1 - progress);
+      const squeeze = 1 - progress * 0.12;
+      const dp = pendingGrab.doll.mesh.position;
+      dp.set(cp.x + jitter, cp.y - 4.0, cp.z + jitter);
+      pendingGrab.doll.mesh.scale.set(squeeze, squeeze, squeeze);
+      // 括號跟著娃娃 + 彈跳縮放效果
+      grabIndicator.position.copy(dp);
+      const pulse = 1 + Math.sin(progress * Math.PI) * 0.15;
+      grabIndicator.scale.setScalar((pendingGrab.doll.mesh.userData.origScale ?? 0.85) * pulse);
+    }
+    grabTimer -= dt;
+    if (grabTimer <= 0) {
+      if (pendingGrab && pendingGrab.success && pendingGrab.doll)
+        pendingGrab.doll.mesh.scale.setScalar(pendingGrab.doll.mesh.userData.origScale ?? 0.85);
+      state = ST.ASCEND;
+    }
+
+  } else if (state === ST.ASCEND) {
+    cp.y += V_SPEED * dt;
+    if (pendingGrab && pendingGrab.success && pendingGrab.doll) {
+      const dp = pendingGrab.doll.mesh.position;
+      dp.set(cp.x, cp.y - 4.0, cp.z);
+      grabIndicator.position.copy(dp);
+    }
+    if (cp.y >= CLAW_HOME_Y) {
+      cp.y = CLAW_HOME_Y;
+      if (pendingGrab && pendingGrab.success && pendingGrab.doll) {
+        state = ST.DEPOSIT;
+      } else {
+        if (pendingGrab && pendingGrab.doll) { playFail(); showMsg('手滑了！娃娃跑掉了 😢'); }
+        else showMsg('這裡沒有娃娃…');
+        grabIndicator.visible = false;
+        pendingGrab = null;
+        state = ST.RETURN;
+      }
+    }
+
+  } else if (state === ST.DEPOSIT) {
+    const dx = CHUTE_X - cp.x, dz = CHUTE_Z - cp.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist > 0.15) {
+      cp.x += (dx/dist) * H_SPEED * dt;
+      cp.z += (dz/dist) * H_SPEED * dt;
+      if (pendingGrab && pendingGrab.doll) {
+        const dp = pendingGrab.doll.mesh.position;
+        dp.set(cp.x, cp.y - 4.0, cp.z);
+        grabIndicator.position.copy(dp);
+      }
+    } else {
+      if (pendingGrab && pendingGrab.doll) {
+        fingerOpen = FINGER_MAX; updateFingers();
+        grabIndicator.visible = false;
+        fallingDoll = { mesh: pendingGrab.doll.mesh, vy: 0 };
+        pendingGrab.doll.grabbed = true;
+        collection.push(pendingGrab.doll.type);
+        updateShelf();
+        playSuccess();
+        const capturedType = pendingGrab.doll.type;
+        setTimeout(() => showModal(capturedType), 700);
+        pendingGrab = null;
+      }
+      state = ST.MODAL;
+    }
+
+  } else if (state === ST.RETURN) {
+    const dx = -cp.x, dz = -cp.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist > 0.06) {
+      cp.x += (dx/dist) * H_SPEED * dt;
+      cp.z += (dz/dist) * H_SPEED * dt;
+    } else {
+      cp.x = 0; cp.z = 0;
+      fingerOpen = FINGER_MAX; updateFingers();
+      state = ST.IDLE;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// ANIMATION LOOP
+// ─────────────────────────────────────────────
+let prevT = 0;
+spawnDolls();
+
+function animate(t) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((t - prevT) / 1000, 0.05);
+  prevT = t;
+
+  // Claw movement
+  if (state === ST.IDLE) {
+    let moved = false;
+    if (keys.lt) { clawG.position.x = Math.max(-XLIM, clawG.position.x - CLAW_MOVE); moved = true; }
+    if (keys.rt) { clawG.position.x = Math.min( XLIM, clawG.position.x + CLAW_MOVE); moved = true; }
+    if (keys.up) { clawG.position.z = Math.max(-ZLIM, clawG.position.z - CLAW_MOVE); moved = true; }
+    if (keys.dn) { clawG.position.z = Math.min( ZLIM, clawG.position.z + CLAW_MOVE); moved = true; }
+  }
+
+  updateState(dt);
+
+  // Shadow under claw
+  shadowPlane.position.set(clawG.position.x, FLOOR_Y + 0.02, clawG.position.z);
+
+  // Claw light pulse
+  clawLight.intensity = 0.5 + Math.sin(t * 0.004) * 0.25;
+
+  // 掉落娃娃重力動畫
+  if (fallingDoll) {
+    fallingDoll.vy -= 18 * dt;
+    fallingDoll.mesh.position.y += fallingDoll.vy * dt;
+    fallingDoll.mesh.rotation.x += dt * 4;
+    fallingDoll.mesh.rotation.z += dt * 2.5;
+    if (fallingDoll.mesh.position.y < FLOOR_Y - 6) {
+      scene3.remove(fallingDoll.mesh);
+      fallingDoll = null;
+    }
+  }
+
+  // 寵物動畫 + 在箱內走動
+  dolls.forEach((d, i) => {
+    // 已夾走 or 正被爪子夾住中 → 不執行走路/動畫（避免位置被覆蓋）
+    const isBeingGrabbed = pendingGrab && pendingGrab.doll === d && pendingGrab.success;
+    if (d.grabbed || isBeingGrabbed) return;
+    // 呼叫每隻寵物的動畫更新
+    if (d.mesh.userData.update) d.mesh.userData.update(t, i);
+    // 走向目標
+    const dx = d.wtx - d.mesh.position.x;
+    const dz = d.wtz - d.mesh.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    // 格栅禁入區判斷（比格栅多留 0.3 的安全距離）
+    const GRATE_MARGIN = GS + 0.3;
+    const inGrate = (x, z) =>
+      Math.abs(x - GX) < GRATE_MARGIN && Math.abs(z - GZ) < GRATE_MARGIN;
+    // 若目標在格栅內就重新選
+    if (inGrate(d.wtx, d.wtz)) {
+      d.wtx = (Math.random() - 0.5) * 5.0;
+      d.wtz = (Math.random() - 0.5) * 5.0;
+    } else if (dist < 0.2) {
+      d.wtx = (Math.random() - 0.5) * 5.0;
+      d.wtz = (Math.random() - 0.5) * 5.0;
+    } else {
+      const nx = d.mesh.position.x + (dx / dist) * d.wspd * dt;
+      const nz = d.mesh.position.z + (dz / dist) * d.wspd * dt;
+      // 新位置不在格栅內才移動，否則沿邊緣滑開
+      if (!inGrate(nx, nz)) {
+        d.mesh.position.x = nx;
+        d.mesh.position.z = nz;
+      } else {
+        // 嘗試只移動不碰格栅的那個軸
+        if (!inGrate(nx, d.mesh.position.z)) d.mesh.position.x = nx;
+        else if (!inGrate(d.mesh.position.x, nz)) d.mesh.position.z = nz;
+        else { d.wtx = (Math.random()-0.5)*5.0; d.wtz = (Math.random()-0.5)*5.0; }
+      }
+      d.mesh.position.y = d.baseY;
+      d.mesh.rotation.y = Math.atan2(dx, dz);
+    }
+  });
+
+  renderer.render(scene3, camera);
+}
+
+requestAnimationFrame(animate);
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
